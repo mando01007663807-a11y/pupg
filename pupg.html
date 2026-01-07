@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Royale - 2D Battle Royale</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1200px;
+            max-height: 800px;
+            box-shadow: 0 0 30px rgba(0, 200, 255, 0.5);
+        }
+        
+        #gameCanvas {
+            background-color: #0a0a15;
+            display: block;
+        }
+        
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .hud-section {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00a2ff;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 0 15px rgba(0, 162, 255, 0.5);
+        }
+        
+        .health-bar {
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(to right, #ff0000, #ff5500, #ffff00, #00ff00);
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+        
+        #miniMap {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            border: 2px solid #00a2ff;
+            border-radius: 5px;
+            background-color: rgba(10, 10, 25, 0.9);
+            box-shadow: 0 0 15px rgba(0, 162, 255, 0.5);
+        }
+        
+        #gameOverScreen, #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #gameOverScreen h1, #startScreen h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #00a2ff;
+            text-shadow: 0 0 15px #00a2ff;
+        }
+        
+        #gameOverScreen h2, #startScreen h2 {
+            font-size: 2em;
+            margin-bottom: 30px;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        
+        #gameOverScreen p, #startScreen p {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #fff;
+            max-width: 600px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+        
+        .control-item {
+            background-color: rgba(0, 100, 200, 0.3);
+            padding: 8px;
+            border-radius: 5px;
+            text-align: left;
+        }
+        
+        button {
+            background: linear-gradient(to bottom, #00a2ff, #0055aa);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 15px rgba(0, 162, 255, 0.7);
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: linear-gradient(to bottom, #00c2ff, #0077cc);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 162, 255, 1);
+        }
+        
+        .key {
+            display: inline-block;
+            background-color: #333;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin: 0 5px;
+            font-family: monospace;
+            border: 1px solid #666;
+        }
+        
+        .weapon-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        #zoneTimer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            pointer-events: none;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ff5500;
+            border-radius: 5px;
+            padding: 10px;
+            color: #ff9900;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(255, 85, 0, 0.5);
+        }
+        
+        .remaining-enemies {
+            color: #ff5555;
+            font-weight: bold;
+        }
+        
+        .safe-zone {
+            color: #55ff55;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="hud">
+            <div class="hud-section">
+                <div class="health-bar">
+                    <div id="healthFill" class="health-fill" style="width: 100%;"></div>
+                </div>
+                <div id="healthText">HEALTH: 100</div>
+            </div>
+            
+            <div class="hud-section">
+                <div id="weaponInfo">
+                    <div id="weaponName">PISTOL</div>
+                    <div id="ammoInfo">AMMO: ∞</div>
+                </div>
+            </div>
+            
+            <div class="hud-section">
+                <div id="enemyCount">ENEMIES: 50</div>
+                <div id="zoneStatus">SAFE ZONE: 100%</div>
+            </div>
+        </div>
+        
+        <div id="zoneTimer">
+            <div id="zoneTimerText">ZONE SHRINKS IN: 60s</div>
+        </div>
+        
+        <canvas id="miniMap" width="200" height="200"></canvas>
+        
+        <div id="startScreen">
+            <h1>NEON ROYALE</h1>
+            <h2>2D BATTLE ROYALE</h2>
+            <p>Survive in a cyberpunk city, eliminate all enemies, and stay inside the safe zone as it shrinks!</p>
+            
+            <div class="controls">
+                <div class="control-item"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> - MOVE</div>
+                <div class="control-item">MOUSE - AIM & SHOOT</div>
+                <div class="control-item"><span class="key">1</span>-<span class="key">4</span> - SWITCH WEAPONS</div>
+                <div class="control-item"><span class="key">E</span> - ENTER/EXIT VEHICLE</div>
+                <div class="control-item"><span class="key">SPACE</span> - USE ITEM</div>
+                <div class="control-item"><span class="key">R</span> - RELOAD</div>
+            </div>
+            
+            <p>Collect health packs, use vehicles, and survive to be the last one standing!</p>
+            <button id="startButton">START GAME</button>
+        </div>
+        
+        <div id="gameOverScreen" style="display: none;">
+            <h1 id="gameOverTitle">GAME OVER</h1>
+            <h2 id="gameOverSubtitle">You have been eliminated</h2>
+            <p id="gameOverStats">You survived for 0 seconds and eliminated 0 enemies.</p>
+            <button id="restartButton">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const miniMapCanvas = document.getElementById('miniMap');
+        const miniMapCtx = miniMapCanvas.getContext('2d');
+        
+        // Set canvas size to match container
+        function resizeCanvas() {
+            canvas.width = document.getElementById('gameContainer').clientWidth;
+            canvas.height = document.getElementById('gameContainer').clientHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // Game state
+        let gameState = 'start'; // 'start', 'playing', 'gameover'
+        let gameTime = 0;
+        let enemiesRemaining = 50;
+        let playerScore = 0;
+        let zoneShrinkTimer = 60; // seconds until zone shrinks
+        let zoneSize = 1.0; // percentage of map that is safe (1.0 = full map)
+        let safeZoneX = 2000;
+        let safeZoneY = 2000;
+        let safeZoneRadius = 2000;
+        
+        // Player object
+        const player = {
+            x: 2000,
+            y: 2000,
+            radius: 15,
+            color: '#00ff00',
+            speed: 3,
+            health: 100,
+            maxHealth: 100,
+            aimingAngle: 0,
+            isShooting: false,
+            lastShot: 0,
+            weaponIndex: 0,
+            inVehicle: false,
+            vehicle: null,
+            score: 0,
+            kills: 0,
+            survivalTime: 0
+        };
+        
+        // Weapons data
+        const weapons = [
+            {
+                name: "PISTOL",
+                color: "#cccccc",
+                damage: 15,
+                fireRate: 300, // ms between shots
+                bulletSpeed: 10,
+                bulletSize: 3,
+                ammo: Infinity,
+                maxAmmo: Infinity,
+                spread: 0.05,
+                sound: "pistol"
+            },
+            {
+                name: "ASSAULT RIFLE",
+                color: "#ffaa00",
+                damage: 10,
+                fireRate: 100,
+                bulletSpeed: 12,
+                bulletSize: 4,
+                ammo: 120,
+                maxAmmo: 120,
+                spread: 0.1,
+                sound: "rifle"
+            },
+            {
+                name: "SHOTGUN",
+                color: "#ff5500",
+                damage: 8,
+                fireRate: 800,
+                bulletSpeed: 8,
+                bulletSize: 2,
+                ammo: 24,
+                maxAmmo: 24,
+                spread: 0.3,
+                pellets: 8,
+                sound: "shotgun"
+            },
+            {
+                name: "BAZOOKA",
+                color: "#ff0000",
+                damage: 50,
+                fireRate: 1500,
+                bulletSpeed: 6,
+                bulletSize: 8,
+                ammo: 5,
+                maxAmmo: 5,
+                spread: 0,
+                explosionRadius: 80,
+                sound: "bazooka"
+            }
+        ];
+        
+        // Game objects arrays
+        let buildings = [];
+        let enemies = [];
+        let bullets = [];
+        let explosions = [];
+        let vehicles = [];
+        let items = [];
+        
+        // Input state
+        const keys = {};
+        const mouse = {
+            x: 0,
+            y: 0,
+            down: false
+        };
+        
+        // Map dimensions
+        const MAP_WIDTH = 4000;
+        const MAP_HEIGHT = 4000;
+        
+        // Generate game world
+        function generateWorld() {
+            // Generate buildings
+            buildings = [];
+            for (let i = 0; i < 80; i++) {
+                const width = Math.random() * 100 + 50;
+                const height = Math.random() * 100 + 50;
+                const x = Math.random() * (MAP_WIDTH - width);
+                const y = Math.random() * (MAP_HEIGHT - height);
+                
+                // Random neon color
+                const colors = ['#00a2ff', '#ff00ff', '#00ffaa', '#ff5500', '#aa00ff'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                buildings.push({
+                    x, y, width, height, color,
+                    enterable: Math.random() > 0.7 // 30% chance of being enterable
+                });
+            }
+            
+            // Generate enemies
+            enemies = [];
+            for (let i = 0; i < 50; i++) {
+                // Place enemies away from player's starting position
+                let x, y;
+                do {
+                    x = Math.random() * MAP_WIDTH;
+                    y = Math.random() * MAP_HEIGHT;
+                } while (distance(x, y, player.x, player.y) < 500);
+                
+                enemies.push({
+                    x, y,
+                    radius: 12,
+                    color: '#ff5555',
+                    speed: 1.5,
+                    health: 100,
+                    maxHealth: 100,
+                    lastShot: 0,
+                    fireRate: 1000 + Math.random() * 1000,
+                    damage: 10,
+                    bulletSpeed: 8,
+                    targetX: x,
+                    targetY: y,
+                    state: 'wandering' // 'wandering', 'chasing', 'attacking'
+                });
+            }
+            
+            // Generate vehicles
+            vehicles = [];
+            for (let i = 0; i < 8; i++) {
+                const x = Math.random() * MAP_WIDTH;
+                const y = Math.random() * MAP_HEIGHT;
+                
+                const colors = ['#00a2ff', '#ff00ff', '#00ffaa', '#ffaa00'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                vehicles.push({
+                    x, y,
+                    width: 40,
+                    height: 25,
+                    color: color,
+                    speed: 6,
+                    occupied: false,
+                    angle: Math.random() * Math.PI * 2
+                });
+            }
+            
+            // Generate health packs
+            items = [];
+            for (let i = 0; i < 20; i++) {
+                const x = Math.random() * MAP_WIDTH;
+                const y = Math.random() * MAP_HEIGHT;
+                
+                items.push({
+                    x, y,
+                    radius: 10,
+                    color: '#ff0000',
+                    type: 'health',
+                    value: 30
+                });
+            }
+            
+            // Initialize safe zone
+            safeZoneX = MAP_WIDTH / 2;
+            safeZoneY = MAP_HEIGHT / 2;
+            safeZoneRadius = Math.min(MAP_WIDTH, MAP_HEIGHT) / 2;
+        }
+        
+        // Utility functions
+        function distance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+        
+        function angleBetween(x1, y1, x2, y2) {
+            return Math.atan2(y2 - y1, x2 - x1);
+        }
+        
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+        
+        // Check collision between circle and rectangle
+        function circleRectCollision(cx, cy, radius, rx, ry, rw, rh) {
+            let testX = cx;
+            let testY = cy;
+            
+            if (cx < rx) testX = rx;
+            else if (cx > rx + rw) testX = rx + rw;
+            
+            if (cy < ry) testY = ry;
+            else if (cy > ry + rh) testY = ry + rh;
+            
+            return distance(cx, cy, testX, testY) <= radius;
+        }
+        
+        // Check collision between two circles
+        function circleCollision(x1, y1, r1, x2, y2, r2) {
+            return distance(x1, y1, x2, y2) <= r1 + r2;
+        }
+        
+        // Check if point is inside rectangle
+        function pointInRect(px, py, rx, ry, rw, rh) {
+            return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+        }
+        
+        // Input handling
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            
+            // Weapon switching
+            if (e.key >= '1' && e.key <= '4') {
+                const weaponIndex = parseInt(e.key) - 1;
+                if (weaponIndex < weapons.length) {
+                    player.weaponIndex = weaponIndex;
+                    updateWeaponDisplay();
+                }
+            }
+            
+            // Enter/exit vehicle
+            if (e.key === 'e' || e.key === 'E') {
+                if (!player.inVehicle) {
+                    // Try to enter a vehicle
+                    for (const vehicle of vehicles) {
+                        if (!vehicle.occupied && distance(player.x, player.y, vehicle.x, vehicle.y) < 50) {
+                            player.inVehicle = true;
+                            player.vehicle = vehicle;
+                            vehicle.occupied = true;
+                            player.speed = vehicle.speed;
+                            break;
+                        }
+                    }
+                } else {
+                    // Exit vehicle
+                    player.inVehicle = false;
+                    player.vehicle.occupied = false;
+                    player.vehicle = null;
+                    player.speed = 3;
+                }
+            }
+            
+            // Reload
+            if (e.key === 'r' || e.key === 'R') {
+                const weapon = weapons[player.weaponIndex];
+                if (weapon.ammo !== Infinity) {
+                    weapon.ammo = weapon.maxAmmo;
+                    updateWeaponDisplay();
+                }
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+        
+        canvas.addEventListener('mousedown', () => {
+            mouse.down = true;
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            mouse.down = false;
+        });
+        
+        // Update weapon display in HUD
+        function updateWeaponDisplay() {
+            const weapon = weapons[player.weaponIndex];
+            document.getElementById('weaponName').textContent = weapon.name;
+            document.getElementById('ammoInfo').textContent = 
+                weapon.ammo === Infinity ? 'AMMO: ∞' : `AMMO: ${weapon.ammo}/${weapon.maxAmmo}`;
+        }
+        
+        // Update health display
+        function updateHealthDisplay() {
+            const healthPercent = (player.health / player.maxHealth) * 100;
+            document.getElementById('healthFill').style.width = `${healthPercent}%`;
+            document.getElementById('healthText').textContent = `HEALTH: ${Math.round(player.health)}`;
+            
+            // Change color based on health
+            let color;
+            if (healthPercent > 70) color = '#00ff00';
+            else if (healthPercent > 40) color = '#ffff00';
+            else if (healthPercent > 20) color = '#ff5500';
+            else color = '#ff0000';
+            
+            document.getElementById('healthFill').style.background = `linear-gradient(to right, ${color}, ${color})`;
+        }
+        
+        // Update game stats display
+        function updateGameStats() {
+            document.getElementById('enemyCount').innerHTML = 
+                `ENEMIES: <span class="remaining-enemies">${enemiesRemaining}</span>`;
+            document.getElementById('zoneStatus').innerHTML = 
+                `SAFE ZONE: <span class="safe-zone">${Math.round(zoneSize * 100)}%</span>`;
+            
+            // Update zone timer
+            document.getElementById('zoneTimerText').textContent = 
+                `ZONE SHRINKS IN: ${Math.round(zoneShrinkTimer)}s`;
+        }
+        
+        // Player shooting
+        function playerShoot() {
+            const now = Date.now();
+            const weapon = weapons[player.weaponIndex];
+            
+            // Check if can shoot (fire rate and ammo)
+            if (now - player.lastShot < weapon.fireRate) return;
+            if (weapon.ammo <= 0) return;
+            
+            // Use ammo if not infinite
+            if (weapon.ammo !== Infinity) {
+                weapon.ammo--;
+                updateWeaponDisplay();
+            }
+            
+            player.lastShot = now;
+            
+            // Calculate bullet direction (from player to mouse position in world)
+            const worldMouseX = player.x - (canvas.width / 2) + mouse.x;
+            const worldMouseY = player.y - (canvas.height / 2) + mouse.y;
+            let angle = angleBetween(player.x, player.y, worldMouseX, worldMouseY);
+            
+            // Apply weapon spread
+            angle += randomInRange(-weapon.spread, weapon.spread);
+            
+            // Create bullet(s)
+            if (weapon.name === "SHOTGUN") {
+                // Shotgun fires multiple pellets
+                for (let i = 0; i < weapon.pellets; i++) {
+                    const pelletAngle = angle + randomInRange(-0.2, 0.2);
+                    bullets.push({
+                        x: player.x,
+                        y: player.y,
+                        angle: pelletAngle,
+                        speed: weapon.bulletSpeed + randomInRange(-2, 2),
+                        damage: weapon.damage,
+                        size: weapon.bulletSize,
+                        color: weapon.color,
+                        owner: 'player',
+                        life: 2000 // bullets disappear after 2 seconds
+                    });
+                }
+            } else if (weapon.name === "BAZOOKA") {
+                // Bazooka fires explosive rockets
+                bullets.push({
+                    x: player.x,
+                    y: player.y,
+                    angle: angle,
+                    speed: weapon.bulletSpeed,
+                    damage: weapon.damage,
+                    size: weapon.bulletSize,
+                    color: weapon.color,
+                    owner: 'player',
+                    life: 3000,
+                    explosive: true,
+                    explosionRadius: weapon.explosionRadius
+                });
+            } else {
+                // Regular bullet
+                bullets.push({
+                    x: player.x,
+                    y: player.y,
+                    angle: angle,
+                    speed: weapon.bulletSpeed,
+                    damage: weapon.damage,
+                    size: weapon.bulletSize,
+                    color: weapon.color,
+                    owner: 'player',
+                    life: 2000
+                });
+            }
+        }
+        
+        // Enemy AI and shooting
+        function updateEnemies() {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                
+                // Calculate distance to player
+                const distToPlayer = distance(enemy.x, enemy.y, player.x, player.y);
+                
+                // Update enemy state
+                if (distToPlayer < 300) {
+                    enemy.state = 'chasing';
+                } else if (distToPlayer < 500) {
+                    enemy.state = 'attacking';
+                } else {
+                    enemy.state = 'wandering';
+                }
+                
+                // Move enemy based on state
+                if (enemy.state === 'chasing') {
+                    // Move towards player
+                    const angle = angleBetween(enemy.x, enemy.y, player.x, player.y);
+                    enemy.x += Math.cos(angle) * enemy.speed;
+                    enemy.y += Math.sin(angle) * enemy.speed;
+                    
+                    // Avoid buildings
+                    for (const building of buildings) {
+                        if (circleRectCollision(enemy.x, enemy.y, enemy.radius, 
+                                                building.x, building.y, building.width, building.height)) {
+                            // Move away from building
+                            const buildingCenterX = building.x + building.width / 2;
+                            const buildingCenterY = building.y + building.height / 2;
+                            const avoidAngle = angleBetween(buildingCenterX, buildingCenterY, enemy.x, enemy.y);
+                            enemy.x += Math.cos(avoidAngle) * enemy.speed;
+                            enemy.y += Math.sin(avoidAngle) * enemy.speed;
+                        }
+                    }
+                } else if (enemy.state === 'attacking') {
+                    // Enemy shoots at player
+                    const now = Date.now();
+                    if (now - enemy.lastShot > enemy.fireRate) {
+                        enemy.lastShot = now;
+                        
+                        const angle = angleBetween(enemy.x, enemy.y, player.x, player.y);
+                        bullets.push({
+                            x: enemy.x,
+                            y: enemy.y,
+                            angle: angle + randomInRange(-0.1, 0.1), // Add some inaccuracy
+                            speed: enemy.bulletSpeed,
+                            damage: enemy.damage,
+                            size: 3,
+                            color: '#ff5555',
+                            owner: 'enemy',
+                            life: 1500
+                        });
+                    }
+                } else {
+                    // Wandering - move randomly
+                    if (Math.random() < 0.02) {
+                        enemy.targetX = enemy.x + randomInRange(-200, 200);
+                        enemy.targetY = enemy.y + randomInRange(-200, 200);
+                    }
+                    
+                    const angle = angleBetween(enemy.x, enemy.y, enemy.targetX, enemy.targetY);
+                    enemy.x += Math.cos(angle) * enemy.speed * 0.5;
+                    enemy.y += Math.sin(angle) * enemy.speed * 0.5;
+                }
+                
+                // Check if enemy is outside safe zone
+                const distToSafeZone = distance(enemy.x, enemy.y, safeZoneX, safeZoneY);
+                if (distToSafeZone > safeZoneRadius) {
+                    // Move towards safe zone
+                    const angle = angleBetween(enemy.x, enemy.y, safeZoneX, safeZoneY);
+                    enemy.x += Math.cos(angle) * enemy.speed * 0.8;
+                    enemy.y += Math.sin(angle) * enemy.speed * 0.8;
+                }
+                
+                // Keep enemies within map bounds
+                enemy.x = Math.max(enemy.radius, Math.min(MAP_WIDTH - enemy.radius, enemy.x));
+                enemy.y = Math.max(enemy.radius, Math.min(MAP_HEIGHT - enemy.radius, enemy.y));
+            }
+        }
+        
+        // Update bullets
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                
+                // Move bullet
+                bullet.x += Math.cos(bullet.angle) * bullet.speed;
+                bullet.y += Math.sin(bullet.angle) * bullet.speed;
+                
+                // Decrease life
+                bullet.life -= 16; // Assuming 60 FPS
+                
+                // Check if bullet is out of life or out of bounds
+                if (bullet.life <= 0 || 
+                    bullet.x < 0 || bullet.x > MAP_WIDTH || 
+                    bullet.y < 0 || bullet.y > MAP_HEIGHT) {
+                    
+                    // If it's an explosive bullet, create explosion
+                    if (bullet.explosive) {
+                        createExplosion(bullet.x, bullet.y, bullet.explosionRadius);
+                    }
+                    
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                // Check collision with buildings
+                let hitBuilding = false;
+                for (const building of buildings) {
+                    if (pointInRect(bullet.x, bullet.y, building.x, building.y, building.width, building.height)) {
+                        hitBuilding = true;
+                        
+                        // If it's an explosive bullet, create explosion
+                        if (bullet.explosive) {
+                            createExplosion(bullet.x, bullet.y, bullet.explosionRadius);
+                        }
+                        
+                        break;
+                    }
+                }
+                
+                if (hitBuilding) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                // Check collision with enemies (if bullet is from player)
+                if (bullet.owner === 'player') {
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const enemy = enemies[j];
+                        if (circleCollision(bullet.x, bullet.y, bullet.size, enemy.x, enemy.y, enemy.radius)) {
+                            // Damage enemy
+                            enemy.health -= bullet.damage;
+                            
+                            // If explosive bullet, create explosion
+                            if (bullet.explosive) {
+                                createExplosion(bullet.x, bullet.y, bullet.explosionRadius);
+                            }
+                            
+                            // Check if enemy dies
+                            if (enemy.health <= 0) {
+                                enemies.splice(j, 1);
+                                enemiesRemaining--;
+                                player.kills++;
+                                player.score += 100;
+                                
+                                // Random chance to drop health pack
+                                if (Math.random() < 0.3) {
+                                    items.push({
+                                        x: enemy.x,
+                                        y: enemy.y,
+                                        radius: 10,
+                                        color: '#ff0000',
+                                        type: 'health',
+                                        value: 30
+                                    });
+                                }
+                            }
+                            
+                            bullets.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+                
+                // Check collision with player (if bullet is from enemy)
+                if (bullet.owner === 'enemy' && 
+                    circleCollision(bullet.x, bullet.y, bullet.size, player.x, player.y, player.radius)) {
+                    
+                    // Damage player
+                    player.health -= bullet.damage;
+                    updateHealthDisplay();
+                    
+                    // Check if player dies
+                    if (player.health <= 0) {
+                        gameOver(false);
+                    }
+                    
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+        
+        // Create explosion
+        function createExplosion(x, y, radius) {
+            explosions.push({
+                x, y,
+                radius: 0,
+                maxRadius: radius,
+                color: '#ffaa00',
+                life: 1.0 // from 1 to 0
+            });
+            
+            // Damage entities in explosion radius
+            // Damage enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const dist = distance(x, y, enemy.x, enemy.y);
+                
+                if (dist < radius) {
+                    // Damage proportional to distance
+                    const damage = 50 * (1 - dist / radius);
+                    enemy.health -= damage;
+                    
+                    if (enemy.health <= 0) {
+                        enemies.splice(i, 1);
+                        enemiesRemaining--;
+                        player.kills++;
+                        player.score += 100;
+                    }
+                }
+            }
+            
+            // Damage player
+            const distToPlayer = distance(x, y, player.x, player.y);
+            if (distToPlayer < radius) {
+                const damage = 30 * (1 - distToPlayer / radius);
+                player.health -= damage;
+                updateHealthDisplay();
+                
+                if (player.health <= 0) {
+                    gameOver(false);
+                }
+            }
+        }
+        
+        // Update explosions
+        function updateExplosions() {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const explosion = explosions[i];
+                
+                // Expand explosion
+                explosion.radius += 5;
+                explosion.life -= 0.03;
+                
+                // Remove when done
+                if (explosion.life <= 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+        
+        // Update items (health packs)
+        function updateItems() {
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                
+                // Check if player picks up item
+                if (circleCollision(player.x, player.y, player.radius, item.x, item.y, item.radius)) {
+                    if (item.type === 'health') {
+                        player.health = Math.min(player.maxHealth, player.health + item.value);
+                        updateHealthDisplay();
+                    }
+                    
+                    items.splice(i, 1);
+                }
+            }
+        }
+        
+        // Update safe zone
+        function updateSafeZone(deltaTime) {
+            // Update timer
+            zoneShrinkTimer -= deltaTime / 1000;
+            
+            if (zoneShrinkTimer <= 0) {
+                // Shrink zone
+                zoneSize = Math.max(0.2, zoneSize - 0.1);
+                safeZoneRadius = (Math.min(MAP_WIDTH, MAP_HEIGHT) / 2) * zoneSize;
+                
+                // Move safe zone center randomly (but keep it within map)
+                safeZoneX += randomInRange(-200, 200);
+                safeZoneY += randomInRange(-200, 200);
+                safeZoneX = Math.max(safeZoneRadius, Math.min(MAP_WIDTH - safeZoneRadius, safeZoneX));
+                safeZoneY = Math.max(safeZoneRadius, Math.min(MAP_HEIGHT - safeZoneRadius, safeZoneY));
+                
+                // Reset timer
+                zoneShrinkTimer = 60; // 60 seconds until next shrink
+            }
+            
+            // Damage player if outside safe zone
+            const distToSafeZone = distance(player.x, player.y, safeZoneX, safeZoneY);
+            if (distToSafeZone > safeZoneRadius) {
+                // Damage proportional to how far outside the zone
+                const damageMultiplier = Math.min(2, (distToSafeZone - safeZoneRadius) / 100);
+                player.health -= 0.1 * damageMultiplier;
+                updateHealthDisplay();
+                
+                if (player.health <= 0) {
+                    gameOver(false);
+                }
+            }
+        }
+        
+        // Game over
+        function gameOver(won) {
+            gameState = 'gameover';
+            
+            if (won) {
+                document.getElementById('gameOverTitle').textContent = 'VICTORY!';
+                document.getElementById('gameOverSubtitle').textContent = 'You eliminated all enemies!';
+            } else {
+                document.getElementById('gameOverTitle').textContent = 'GAME OVER';
+                document.getElementById('gameOverSubtitle').textContent = 'You have been eliminated';
+            }
+            
+            document.getElementById('gameOverStats').textContent = 
+                `You survived for ${Math.round(player.survivalTime)} seconds and eliminated ${player.kills} enemies.`;
+            
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+        
+        // Check win condition
+        function checkWinCondition() {
+            if (enemiesRemaining <= 0) {
+                gameOver(true);
+            }
+        }
+        
+        // Draw functions
+        function drawMap() {
+            // Draw map background
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Calculate camera offset (center on player)
+            const offsetX = canvas.width / 2 - player.x;
+            const offsetY = canvas.height / 2 - player.y;
+            
+            // Save context and apply camera transform
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            
+            // Draw safe zone
+            ctx.beginPath();
+            ctx.arc(safeZoneX, safeZoneY, safeZoneRadius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 100, 200, 0.1)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 200, 255, 0.3)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Draw buildings
+            for (const building of buildings) {
+                ctx.fillStyle = building.color;
+                ctx.fillRect(building.x, building.y, building.width, building.height);
+                
+                // Draw building outline
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(building.x, building.y, building.width, building.height);
+                
+                // Draw windows for enterable buildings
+                if (building.enterable) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            const windowX = building.x + building.width * 0.2 + i * building.width * 0.3;
+                            const windowY = building.y + building.height * 0.2 + j * building.height * 0.3;
+                            ctx.fillRect(windowX, windowY, building.width * 0.1, building.height * 0.1);
+                        }
+                    }
+                }
+            }
+            
+            // Draw items
+            for (const item of items) {
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw plus sign for health packs
+                if (item.type === 'health') {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(item.x, item.y - item.radius / 2);
+                    ctx.lineTo(item.x, item.y + item.radius / 2);
+                    ctx.moveTo(item.x - item.radius / 2, item.y);
+                    ctx.lineTo(item.x + item.radius / 2, item.y);
+                    ctx.stroke();
+                }
+            }
+            
+            // Draw vehicles
+            for (const vehicle of vehicles) {
+                ctx.save();
+                ctx.translate(vehicle.x, vehicle.y);
+                ctx.rotate(vehicle.angle);
+                
+                // Vehicle body
+                ctx.fillStyle = vehicle.color;
+                ctx.fillRect(-vehicle.width / 2, -vehicle.height / 2, vehicle.width, vehicle.height);
+                
+                // Vehicle details
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(-vehicle.width / 4, -vehicle.height / 2, vehicle.width / 2, vehicle.height / 3);
+                ctx.fillRect(-vehicle.width / 4, vehicle.height / 3, vehicle.width / 2, vehicle.height / 3);
+                
+                // Wheels
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(-vehicle.width / 2 - 3, -vehicle.height / 2 - 3, 6, 6);
+                ctx.fillRect(vehicle.width / 2 - 3, -vehicle.height / 2 - 3, 6, 6);
+                ctx.fillRect(-vehicle.width / 2 - 3, vehicle.height / 2 - 3, 6, 6);
+                ctx.fillRect(vehicle.width / 2 - 3, vehicle.height / 2 - 3, 6, 6);
+                
+                ctx.restore();
+                
+                // Draw "E" indicator if player is near
+                if (!vehicle.occupied && distance(player.x, player.y, vehicle.x, vehicle.y) < 50) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('E', vehicle.x, vehicle.y - 30);
+                }
+            }
+            
+            // Draw enemies
+            for (const enemy of enemies) {
+                // Enemy body
+                ctx.fillStyle = enemy.color;
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Enemy eyes
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(enemy.x - 4, enemy.y - 4, 3, 0, Math.PI * 2);
+                ctx.arc(enemy.x + 4, enemy.y - 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Enemy pupils
+                const lookAngle = angleBetween(enemy.x, enemy.y, player.x, player.y);
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(enemy.x - 4 + Math.cos(lookAngle) * 1.5, enemy.y - 4 + Math.sin(lookAngle) * 1.5, 1.5, 0, Math.PI * 2);
+                ctx.arc(enemy.x + 4 + Math.cos(lookAngle) * 1.5, enemy.y - 4 + Math.sin(lookAngle) * 1.5, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Enemy health bar
+                const healthPercent = enemy.health / enemy.maxHealth;
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(enemy.x - 15, enemy.y - 25, 30, 5);
+                ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.2 ? '#ffff00' : '#ff0000';
+                ctx.fillRect(enemy.x - 15, enemy.y - 25, 30 * healthPercent, 5);
+            }
+            
+            // Draw explosions
+            for (const explosion of explosions) {
+                const gradient = ctx.createRadialGradient(
+                    explosion.x, explosion.y, 0,
+                    explosion.x, explosion.y, explosion.radius
+                );
+                gradient.addColorStop(0, `rgba(255, 200, 0, ${explosion.life})`);
+                gradient.addColorStop(0.7, `rgba(255, 100, 0, ${explosion.life * 0.5})`);
+                gradient.addColorStop(1, `rgba(255, 0, 0, 0)`);
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, explosion.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw bullets
+            for (const bullet of bullets) {
+                ctx.fillStyle = bullet.color;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw bullet trail
+                ctx.strokeStyle = bullet.color;
+                ctx.lineWidth = bullet.size / 2;
+                ctx.beginPath();
+                ctx.moveTo(bullet.x - Math.cos(bullet.angle) * 5, bullet.y - Math.sin(bullet.angle) * 5);
+                ctx.lineTo(bullet.x, bullet.y);
+                ctx.stroke();
+            }
+            
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw player aiming indicator
+            const aimLength = 30;
+            const aimX = player.x + Math.cos(player.aimingAngle) * aimLength;
+            const aimY = player.y + Math.sin(player.aimingAngle) * aimLength;
+            
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(aimX, aimY);
+            ctx.stroke();
+            
+            // Draw player vehicle if in one
+            if (player.inVehicle) {
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(player.x - 25, player.y - 20, 50, 40);
+                
+                // Draw vehicle indicator
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('IN VEHICLE', player.x, player.y - 30);
+            }
+            
+            ctx.restore(); // Restore camera transform
+        }
+        
+        function drawMiniMap() {
+            // Clear minimap
+            miniMapCtx.fillStyle = '#0a0a15';
+            miniMapCtx.fillRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
+            
+            // Calculate scale
+            const scale = Math.min(miniMapCanvas.width / MAP_WIDTH, miniMapCanvas.height / MAP_HEIGHT);
+            
+            // Draw safe zone on minimap
+            miniMapCtx.fillStyle = 'rgba(0, 100, 255, 0.3)';
+            miniMapCtx.beginPath();
+            miniMapCtx.arc(
+                safeZoneX * scale, 
+                safeZoneY * scale, 
+                safeZoneRadius * scale, 
+                0, Math.PI * 2
+            );
+            miniMapCtx.fill();
+            
+            // Draw buildings on minimap
+            miniMapCtx.fillStyle = 'rgba(100, 100, 200, 0.7)';
+            for (const building of buildings) {
+                miniMapCtx.fillRect(
+                    building.x * scale,
+                    building.y * scale,
+                    building.width * scale,
+                    building.height * scale
+                );
+            }
+            
+            // Draw enemies on minimap
+            miniMapCtx.fillStyle = '#ff5555';
+            for (const enemy of enemies) {
+                miniMapCtx.beginPath();
+                miniMapCtx.arc(
+                    enemy.x * scale,
+                    enemy.y * scale,
+                    2, 0, Math.PI * 2
+                );
+                miniMapCtx.fill();
+            }
+            
+            // Draw player on minimap
+            miniMapCtx.fillStyle = '#00ff00';
+            miniMapCtx.beginPath();
+            miniMapCtx.arc(
+                player.x * scale,
+                player.y * scale,
+                3, 0, Math.PI * 2
+            );
+            miniMapCtx.fill();
+            
+            // Draw minimap border
+            miniMapCtx.strokeStyle = '#00a2ff';
+            miniMapCtx.lineWidth = 2;
+            miniMapCtx.strokeRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
+        }
+        
+        // Main game loop
+        let lastTime = 0;
+        
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            if (gameState === 'playing') {
+                // Update game time
+                gameTime += deltaTime;
+                player.survivalTime = gameTime / 1000;
+                
+                // Update player aiming angle based on mouse
+                const worldMouseX = player.x - (canvas.width / 2) + mouse.x;
+                const worldMouseY = player.y - (canvas.height / 2) + mouse.y;
+                player.aimingAngle = angleBetween(player.x, player.y, worldMouseX, worldMouseY);
+                
+                // Handle player movement
+                let moveX = 0;
+                let moveY = 0;
+                
+                if (keys['w'] || keys['arrowup']) moveY -= 1;
+                if (keys['s'] || keys['arrowdown']) moveY += 1;
+                if (keys['a'] || keys['arrowleft']) moveX -= 1;
+                if (keys['d'] || keys['arrowright']) moveX += 1;
+                
+                // Normalize diagonal movement
+                if (moveX !== 0 && moveY !== 0) {
+                    moveX *= 0.7071; // 1 / sqrt(2)
+                    moveY *= 0.7071;
+                }
+                
+                // Update player position
+                const newX = player.x + moveX * player.speed;
+                const newY = player.y + moveY * player.speed;
+                
+                // Check collision with buildings
+                let canMove = true;
+                for (const building of buildings) {
+                    if (circleRectCollision(newX, newY, player.radius, 
+                                            building.x, building.y, building.width, building.height)) {
+                        canMove = false;
+                        break;
+                    }
+                }
+                
+                if (canMove) {
+                    player.x = newX;
+                    player.y = newY;
+                }
+                
+                // Keep player within map bounds
+                player.x = Math.max(player.radius, Math.min(MAP_WIDTH - player.radius, player.x));
+                player.y = Math.max(player.radius, Math.min(MAP_HEIGHT - player.radius, player.y));
+                
+                // Handle vehicle rotation if in vehicle
+                if (player.inVehicle && player.vehicle) {
+                    if (keys['a'] || keys['arrowleft']) {
+                        player.vehicle.angle -= 0.05;
+                    }
+                    if (keys['d'] || keys['arrowright']) {
+                        player.vehicle.angle += 0.05;
+                    }
+                    
+                    // Update vehicle position to match player
+                    player.vehicle.x = player.x;
+                    player.vehicle.y = player.y;
+                    player.vehicle.angle = player.aimingAngle - Math.PI / 2;
+                }
+                
+                // Handle shooting
+                if (mouse.down) {
+                    playerShoot();
+                }
+                
+                // Update game objects
+                updateEnemies();
+                updateBullets();
+                updateExplosions();
+                updateItems();
+                updateSafeZone(deltaTime);
+                updateGameStats();
+                checkWinCondition();
+            }
+            
+            // Draw everything
+            drawMap();
+            drawMiniMap();
+            
+            // Continue game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start game
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startScreen').style.display = 'none';
+            gameState = 'playing';
+            
+            // Initialize game
+            generateWorld();
+            updateWeaponDisplay();
+            updateHealthDisplay();
+            updateGameStats();
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        });
+        
+        // Restart game
+        document.getElementById('restartButton').addEventListener('click', () => {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Reset player
+            player.x = 2000;
+            player.y = 2000;
+            player.health = 100;
+            player.weaponIndex = 0;
+            player.inVehicle = false;
+            player.vehicle = null;
+            player.speed = 3;
+            player.score = 0;
+            player.kills = 0;
+            player.survivalTime = 0;
+            
+            // Reset game state
+            gameState = 'playing';
+            gameTime = 0;
+            enemiesRemaining = 50;
+            zoneShrinkTimer = 60;
+            zoneSize = 1.0;
+            safeZoneX = 2000;
+            safeZoneY = 2000;
+            safeZoneRadius = 2000;
+            
+            // Clear arrays
+            bullets = [];
+            explosions = [];
+            
+            // Reset weapons ammo
+            weapons[0].ammo = Infinity;
+            weapons[1].ammo = 120;
+            weapons[2].ammo = 24;
+            weapons[3].ammo = 5;
+            
+            // Reinitialize game
+            generateWorld();
+            updateWeaponDisplay();
+            updateHealthDisplay();
+            updateGameStats();
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        });
+        
+        // Initialize the start screen
+        updateWeaponDisplay();
+        updateHealthDisplay();
+        updateGameStats();
+    </script>
+</body>
+</html>
